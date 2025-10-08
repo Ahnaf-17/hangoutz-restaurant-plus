@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hangoutz Restaurant+</title>
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+    <script src="js/app.js" defer></script>
+  </head>
+  <body>
+    <!-- Login Page -->
+    <div data-role="page" id="loginPage">
+      <div data-role="header" data-position="fixed"><h1>Hangoutz Login</h1></div>
+      <div role="main" class="ui-content">
+        <form id="loginForm">
+          <label for="email">Email</label>
+          <input type="email" id="email" required />
+          <label for="password">Password</label>
+          <input type="password" id="password" required />
+          <button type="submit" class="ui-btn ui-btn-b">Login</button>
+        </form>
+        <a href="#signupPage" class="ui-btn ui-btn-inline">Create account</a>
+      </div>
+    </div>
+
+    <!-- Signup Page -->
+    <div data-role="page" id="signupPage">
+      <div data-role="header" data-position="fixed"><h1>Sign Up</h1></div>
+      <div role="main" class="ui-content">
+        <form id="signupForm">
+          <label for="sname">Name</label>
+          <input type="text" id="sname" required />
+          <label for="semail">Email</label>
+          <input type="email" id="semail" required />
+          <label for="spassword">Password</label>
+          <input type="password" id="spassword" minlength="6" required />
+          <button type="submit" class="ui-btn ui-btn-b">Create Account</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Home Page -->
+    <div data-role="page" id="homePage">
+      <div data-role="header" data-position="fixed">
+        <h1>Hangoutz</h1>
+        <a href="#loginPage" id="logoutBtn" class="ui-btn ui-btn-inline ui-btn-right">Logout</a>
+      </div>
+      <div role="main" class="ui-content">
+        <div class="ui-grid-a">
+          <div class="ui-block-a">
+            <a href="#menuPage" class="ui-btn ui-corner-all ui-shadow">Menu</a>
+          </div>
+          <div class="ui-block-b">
+            <a href="#bookingPage" class="ui-btn ui-corner-all ui-shadow">Book a Table</a>
+          </div>
+          <div class="ui-block-a">
+            <a href="#ordersPage" class="ui-btn ui-corner-all ui-shadow">My Orders</a>
+          </div>
+          <div class="ui-block-b">
+            <a href="#profilePage" class="ui-btn ui-corner-all ui-shadow">Profile</a>
+          </div>
+        </div>
+      </div>
+      <div data-role="footer" data-position="fixed"><h4>© Hangoutz Restaurant+</h4></div>
+    </div>
+
+    <!-- Menu Page -->
+    <div data-role="page" id="menuPage">
+      <div data-role="header" data-position="fixed"><h1>Menu</h1><a href="#homePage" class="ui-btn ui-btn-right">Home</a></div>
+      <div role="main" class="ui-content">
+        <ul data-role="listview" id="menuList"></ul>
+        <a href="#" id="placeOrderBtn" class="ui-btn ui-btn-b">Place Order</a>
+      </div>
+    </div>
+
+    <!-- Booking Page -->
+    <div data-role="page" id="bookingPage">
+      <div data-role="header" data-position="fixed"><h1>Book a Table</h1><a href="#homePage" class="ui-btn ui-btn-right">Home</a></div>
+      <div role="main" class="ui-content">
+        <form id="bookingForm">
+          <label for="partySize">Party Size</label>
+          <input type="number" id="partySize" min="1" value="2" />
+          <label for="bdate">Date (YYYY-MM-DD)</label>
+          <input type="text" id="bdate" placeholder="2025-10-07" />
+          <label for="btime">Time (HH:mm)</label>
+          <input type="text" id="btime" placeholder="18:30" />
+          <label for="bnotes">Notes</label>
+          <textarea id="bnotes"></textarea>
+          <button type="submit" class="ui-btn ui-btn-b">Create Booking</button>
+        </form>
+        <h3>My Bookings</h3>
+        <ul data-role="listview" id="bookingList"></ul>
+      </div>
+    </div>
+
+    <!-- Orders Page -->
+    <div data-role="page" id="ordersPage">
+      <div data-role="header" data-position="fixed"><h1>My Orders</h1><a href="#homePage" class="ui-btn ui-btn-right">Home</a></div>
+      <div role="main" class="ui-content">
+        <ul data-role="listview" id="ordersList"></ul>
+      </div>
+    </div>
+
+    <!-- Profile Page -->
+    <div data-role="page" id="profilePage">
+      <div data-role="header" data-position="fixed"><h1>Profile</h1><a href="#homePage" class="ui-btn ui-btn-right">Home</a></div>
+      <div role="main" class="ui-content">
+        <div id="profileBox"></div>
+      </div>
+    </div>
+  </body>
+</html>
