@@ -288,9 +288,9 @@ $(document).on('pageshow', '#profilePage', async function () {
 });
 
 
-// ===============================
+
 // ======== ADMIN FEATURES ========
-// ===============================
+
 
 // Admin page guard + loaders
 $(document).on('pageshow', '#adminPage', async function () {
@@ -305,6 +305,7 @@ $(document).on('pageshow', '#adminPage', async function () {
   }
   await adminLoadMenu();
   await adminLoadOrders();
+  await adminLoadBookings();
 });
 
 // Create menu item (Admin)
@@ -434,6 +435,41 @@ async function adminLoadOrders() {
   }
 }
 
+async function adminLoadBookings() {
+  try {
+    const res = await fetch(`${API_BASE}/api/bookings`, { headers: { ...authHeader() } });
+    const bookings = await res.json();
+    const $list = $('#adminBookingsList').empty();
+
+    bookings.forEach(b => {
+      const canApprove = b.status === 'pending';
+      const canCancel  = b.status !== 'cancelled';
+
+      const li = $(`
+        <li data-id="${b._id}">
+          <h2>Booking ${b._id}</h2>
+          <p>${b.date} ${b.time} • Party: ${b.partySize}</p>
+          <p>Status: <strong>${b.status}</strong></p>
+          <div class="ui-grid-a">
+            <div class="ui-block-a">
+              ${canApprove ? '<a href="#" class="approveBookingBtn ui-btn ui-mini ui-btn-b">Approve</a>' : ''}
+            </div>
+            <div class="ui-block-b">
+              ${canCancel ? '<a href="#" class="cancelBookingBtn ui-btn ui-mini" style="background:#d9534f;color:#fff">Cancel</a>' : ''}
+            </div>
+          </div>
+        </li>
+      `);
+      $list.append(li);
+    });
+
+    $list.listview().listview('refresh');
+  } catch (e) {
+    notify('Failed to load bookings');
+  }
+}
+
+
 // Apply order status change (Admin)
 $(document).on('click', '.applyStatusBtn', async function (e) {
   e.preventDefault();
@@ -454,3 +490,44 @@ $(document).on('click', '.applyStatusBtn', async function (e) {
     notify(err.message);
   }
 });
+
+// Approve booking (Admin/Staff)
+$(document).on('click', '#adminBookingsList .approveBookingBtn', async function (e) {
+  e.preventDefault();
+  const id = $(this).closest('li').data('id');
+  try {
+    const res = await fetch(`${API_BASE}/api/bookings/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
+      body: JSON.stringify({ status: 'confirmed' })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Approve failed');
+    notify('Booking approved');
+    await adminLoadBookings();
+  } catch (err) {
+    notify(err.message);
+  }
+});
+
+// Cancel booking (Admin/Staff)
+$(document).on('click', '#adminBookingsList .cancelBookingBtn', async function (e) {
+  e.preventDefault();
+  const id = $(this).closest('li').data('id');
+  if (!confirm('Cancel this booking?')) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/bookings/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
+      body: JSON.stringify({ status: 'cancelled' })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Cancel failed');
+    notify('Booking cancelled');
+    await adminLoadBookings();
+  } catch (err) {
+    notify(err.message);
+  }
+});
+

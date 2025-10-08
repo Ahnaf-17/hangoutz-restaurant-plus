@@ -43,4 +43,33 @@ router.delete('/:id', auth(), async (req, res) => {
   res.json({ ok: true });
 });
 
+// Admin/Staff: list all bookings
+router.get('/', auth(['staff','admin']), async (req, res) => {
+  const list = await Booking.find({}).sort({ createdAt: -1 });
+  res.json(list);
+});
+
+// Admin/Staff: update booking status (approved/confirmed or cancelled)
+router.put('/:id/status', auth(['staff','admin']), async (req, res) => {
+  const { status } = req.body;
+  const allowed = ['pending','confirmed','cancelled'];
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+  const b = await Booking.findById(req.params.id);
+  if (!b) return res.status(404).json({ error: 'Not found' });
+
+  // simple transition rules (optional)
+  // pending -> confirmed/cancelled; confirmed -> cancelled (allowed); cancelled -> (no-op/allow?)
+  if (b.status === 'cancelled' && status !== 'cancelled') {
+    return res.status(400).json({ error: 'Cannot modify a cancelled booking' });
+  }
+
+  b.status = status;
+  await b.save();
+  res.json(b);
+});
+
+
+
 export default router;
