@@ -206,26 +206,70 @@ $(document).on('pageshow', '#ordersPage', async function () {
     const $list = $('#ordersList').empty();
 
     list.forEach((o) => {
-      // format items with name × qty
-      const itemsText = (o.items || [])
-        .map(i => `${i.qty}× ${i.name}`)
-        .join(', ') || '(no items)';
+      const itemsText = (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ') || '(no items)';
+      const canDelete = (o.status === 'completed' || o.status === 'cancelled');
 
       const li = $(`
-        <li>
-          <h2>Order ${o._id}</h2>
-          <p><strong>Items:</strong> ${itemsText}</p>
-          <p>Status: ${o.status} — Total: $${Number(o.total).toFixed(2)}</p>
+        <li data-id="${o._id}">
+          <a href="#">
+            <h2>Order ${o._id}</h2>
+            <p><strong>Items:</strong> ${itemsText}</p>
+            <p>Status: ${o.status} — Total: $${Number(o.total).toFixed(2)}</p>
+          </a>
+          ${canDelete ? '<a href="#" class="deleteOrderBtn">Delete</a>' : ''}
         </li>
       `);
       $list.append(li);
     });
 
-    $list.listview().listview('refresh');
+    // enable split button style if any delete links exist
+    $list.listview({ splitIcon: 'delete', splitTheme: 'b' }).listview('refresh');
   } catch (e) {
     notify('Failed to load orders');
   }
 });
+
+// Delete order (only for completed/cancelled — server enforces it)
+$(document).on('click', '.deleteOrderBtn', async function (e) {
+  e.preventDefault();
+  const id = $(this).closest('li').data('id');
+  if (!confirm('Delete this order? This cannot be undone.')) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/orders/${id}`, {
+      method: 'DELETE',
+      headers: { ...authHeader() }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Delete failed');
+
+    notify('Order deleted');
+
+    // refresh the list
+    const refresh = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
+    const list = await refresh.json();
+    const $list = $('#ordersList').empty();
+    list.forEach((o) => {
+      const itemsText = (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ') || '(no items)';
+      const canDelete = (o.status === 'completed' || o.status === 'cancelled');
+      const li = $(`
+        <li data-id="${o._id}">
+          <a href="#">
+            <h2>Order ${o._id}</h2>
+            <p><strong>Items:</strong> ${itemsText}</p>
+            <p>Status: ${o.status} — Total: $${Number(o.total).toFixed(2)}</p>
+          </a>
+          ${canDelete ? '<a href="#" class="deleteOrderBtn">Delete</a>' : ''}
+        </li>
+      `);
+      $list.append(li);
+    });
+    $('#ordersList').listview({ splitIcon: 'delete', splitTheme: 'b' }).listview('refresh');
+  } catch (err) {
+    notify(err.message);
+  }
+});
+
 
 // === Profile ===
 $(document).on('pageshow', '#profilePage', async function () {

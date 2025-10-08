@@ -52,16 +52,26 @@ router.put('/:id/status', auth(['staff', 'admin']), async (req, res, next) => {
   }
 });
 
-// Cancel my order
+// Delete/cancel order
 router.delete('/:id', auth(), async (req, res) => {
   const o = await Order.findById(req.params.id);
   if (!o) return res.status(404).json({ error: 'Not found' });
-  if (String(o.userId) !== req.user.id && !['staff','admin'].includes(req.user.role)) {
+
+  const isOwner = String(o.userId) === req.user.id;
+  const isStaff = ['staff', 'admin'].includes(req.user.role);
+
+  if (!isOwner && !isStaff) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  o.status = 'cancelled';
-  await o.save();
-  res.json({ ok: true });
+
+  const deletableByCustomer = ['completed', 'cancelled'].includes(o.status);
+
+  if (isOwner && !deletableByCustomer) {
+    return res.status(400).json({ error: 'You can delete only after order is completed or cancelled' });
+  }
+
+  await o.deleteOne();
+  return res.json({ ok: true, deleted: true });
 });
 
 
