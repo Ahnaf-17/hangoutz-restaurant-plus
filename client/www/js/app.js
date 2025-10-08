@@ -204,15 +204,23 @@ $(document).on('pageshow', '#ordersPage', async function () {
     const res = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
     const list = await res.json();
     const $list = $('#ordersList').empty();
+
     list.forEach((o) => {
-      const li = $(
-        `<li>
+      // format items with name × qty
+      const itemsText = (o.items || [])
+        .map(i => `${i.qty}× ${i.name}`)
+        .join(', ') || '(no items)';
+
+      const li = $(`
+        <li>
           <h2>Order ${o._id}</h2>
+          <p><strong>Items:</strong> ${itemsText}</p>
           <p>Status: ${o.status} — Total: $${Number(o.total).toFixed(2)}</p>
-        </li>`
-      );
+        </li>
+      `);
       $list.append(li);
     });
+
     $list.listview().listview('refresh');
   } catch (e) {
     notify('Failed to load orders');
