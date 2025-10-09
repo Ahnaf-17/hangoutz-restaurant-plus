@@ -198,36 +198,78 @@ $('#bookingForm').on('submit', async function (e) {
 });
 
 // === Orders List (customer) ===
+// $(document).on('pageshow', '#ordersPage', async function () {
+//   if (!TOKEN) return notify('Please login first.');
+//   try {
+//     const res = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
+//     const list = await res.json();
+//     const $list = $('#ordersList').empty();
+
+//     list.forEach((o) => {
+//       const itemsText = (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ') || '(no items)';
+//       const canDelete = (o.status === 'completed' || o.status === 'cancelled');
+
+//       const li = $(`
+//         <li data-id="${o._id}">
+//           <a href="#">
+//             <h2>Order ${o._id}</h2>
+//             <p><strong>Items:</strong> ${itemsText}</p>
+//             <p>Status: ${o.status} — Total: $${Number(o.total).toFixed(2)}</p>
+//           </a>
+//           ${canDelete ? '<a href="#" class="deleteOrderBtn">Delete</a>' : ''}
+//         </li>
+//       `);
+//       $list.append(li);
+//     });
+
+//     // enable split button style if any delete links exist
+//     $list.listview({ splitIcon: 'delete', splitTheme: 'b' }).listview('refresh');
+//   } catch (e) {
+//     notify('Failed to load orders');
+//   }
+// });
 $(document).on('pageshow', '#ordersPage', async function () {
   if (!TOKEN) return notify('Please login first.');
+
   try {
-    const res = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
+    const res  = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
     const list = await res.json();
     const $list = $('#ordersList').empty();
+
+    // fallbacks from session (set these on login)
+    const fallbackName  = sessionStorage.getItem('userName')  || '—';
+    const fallbackEmail = sessionStorage.getItem('userEmail') || '—';
 
     list.forEach((o) => {
       const itemsText = (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ') || '(no items)';
       const canDelete = (o.status === 'completed' || o.status === 'cancelled');
 
+      // prefer populated user -> snapshot fields -> session fallback
+      const userName  = (o.user && o.user.name) || o.customerName  || fallbackName;
+      const userEmail = (o.user && o.user.email) || o.customerEmail || fallbackEmail;
+
       const li = $(`
         <li data-id="${o._id}">
           <a href="#">
             <h2>Order ${o._id}</h2>
+            <p><strong>Customer:</strong> ${userName} &lt; ${ userEmail } &gt;</p>
             <p><strong>Items:</strong> ${itemsText}</p>
-            <p>Status: ${o.status} — Total: $${Number(o.total).toFixed(2)}</p>
+            <p>Status: ${o.status} — Total: $${Number(o.total || 0).toFixed(2)}</p>
           </a>
           ${canDelete ? '<a href="#" class="deleteOrderBtn">Delete</a>' : ''}
         </li>
       `);
+
       $list.append(li);
     });
 
-    // enable split button style if any delete links exist
     $list.listview({ splitIcon: 'delete', splitTheme: 'b' }).listview('refresh');
   } catch (e) {
+    console.error(e);
     notify('Failed to load orders');
   }
 });
+
 
 // Delete order (only for completed/cancelled — server enforces it)
 $(document).on('click', '.deleteOrderBtn', async function (e) {
