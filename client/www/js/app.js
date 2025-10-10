@@ -158,23 +158,60 @@ $(document).on('pageshow', '#bookingPage', async function () {
 
 async function loadBookings() {
   try {
-    const res = await fetch(`${API_BASE}/api/bookings/my`, { headers: { ...authHeader() } });
+    const res  = await fetch(`${API_BASE}/api/bookings/my`, { headers: { ...authHeader() } });
     const list = await res.json();
     const $list = $('#bookingList').empty();
+
+    // fallbacks from what you stored on login
+    const fallbackName  = sessionStorage.getItem('userName')  || '—';
+    const fallbackEmail = sessionStorage.getItem('userEmail') || '—';
+
+    if (!Array.isArray(list) || list.length === 0) {
+      $list.append('<li>No bookings yet.</li>').listview().listview('refresh');
+      return;
+    }
+
     list.forEach((b) => {
-      const li = $(
-        `<li>
-          <h2>${b.date} ${b.time} • ${b.partySize} people</h2>
-          <p>${b.status}</p>
-        </li>`
-      );
+      const userName  = (b.user && b.user.name)  || b.customerName  || fallbackName;
+      const userEmail = (b.user && b.user.email) || b.customerEmail || fallbackEmail;
+
+      const li = $(`
+        <li>
+          <h2>${b.date} ${b.time} • ${b.partySize} ${b.partySize == 1 ? 'person' : 'people'}</h2>
+          <p><strong>Customer:</strong> ${userName} &lt;${userEmail}&gt;</p>
+          <p>${b.status || 'pending'}</p>
+          ${b.notes ? `<p><em>${b.notes}</em></p>` : ''}
+        </li>
+      `);
       $list.append(li);
     });
+
     $list.listview().listview('refresh');
   } catch (e) {
+    console.error(e);
     notify('Failed to load bookings');
   }
 }
+
+// async function loadBookings() {
+//   try {
+//     const res = await fetch(`${API_BASE}/api/bookings/my`, { headers: { ...authHeader() } });
+//     const list = await res.json();
+//     const $list = $('#bookingList').empty();
+//     list.forEach((b) => {
+//       const li = $(
+//         `<li>
+//           <h2>${b.date} ${b.time} • ${b.partySize} people</h2>
+//           <p>${b.status}</p>
+//         </li>`
+//       );
+//       $list.append(li);
+//     });
+//     $list.listview().listview('refresh');
+//   } catch (e) {
+//     notify('Failed to load bookings');
+//   }
+// }
 
 $('#bookingForm').on('submit', async function (e) {
   e.preventDefault();
