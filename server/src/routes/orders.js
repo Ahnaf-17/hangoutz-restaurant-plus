@@ -19,8 +19,33 @@ router.post('/', auth(), async (req, res) => {
 });
 
 // My orders
+// router.get('/my', auth(), async (req, res) => {
+//   const list = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
+//   res.json(list);
+// });
+
 router.get('/my', auth(), async (req, res) => {
-  const list = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
+  const docs = await Order.find({ userId: req.user.id })
+    .sort({ createdAt: -1 })
+    .populate({ path: 'userId', select: 'name email' })
+    .lean();
+  console.log(
+
+    'docs=', docs
+  );
+
+  // normalize response: always return { user: {id,name,email}, ...order }
+  const list = docs.map(o => ({
+    ...o,
+    user: {
+      id: o.userId?._id || req.user.id,
+      name: o.userId?.name || o.customerName || req.user.name,
+      email: o.userId?.email || o.customerEmail || req.user.email,
+    }
+  }));
+  console.log(list);
+
+
   res.json(list);
 });
 
@@ -76,7 +101,7 @@ router.delete('/:id', auth(), async (req, res) => {
 
 
 // Admin/Staff: list all orders
-router.get('/', auth(['staff','admin']), async (req, res) => {
+router.get('/', auth(['staff', 'admin']), async (req, res) => {
   const list = await Order.find({}).sort({ createdAt: -1 });
   res.json(list);
 });

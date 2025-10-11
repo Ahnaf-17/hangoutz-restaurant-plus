@@ -15,11 +15,27 @@ router.post('/', auth(), bookingRules, async (req, res) => {
 });
 
 // My bookings
+// router.get('/my', auth(), async (req, res) => {
+//   const list = await Booking.find({ userId: req.user.id }).sort({ createdAt: -1 });
+//   res.json(list);
+// });
 router.get('/my', auth(), async (req, res) => {
-  const list = await Booking.find({ userId: req.user.id }).sort({ createdAt: -1 });
+  const docs = await Booking.find({ userId: req.user.id })
+    .sort({ createdAt: -1 })
+    .populate({ path: 'userId', select: 'name email' }) // pull name & email
+    .lean();
+
+  const list = docs.map(b => ({
+    ...b,
+    user: {
+      id:    b.userId?._id || req.user.id,
+      name:  b.userId?.name  || b.customerName  || req.user.name,
+      email: b.userId?.email || b.customerEmail || req.user.email,
+    }
+  }));
+
   res.json(list);
 });
-
 // Update booking (owner or staff/admin)
 router.put('/:id', auth(), async (req, res) => {
   const b = await Booking.findById(req.params.id);
