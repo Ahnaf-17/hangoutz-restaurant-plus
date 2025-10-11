@@ -1,6 +1,6 @@
 
 // === CONFIG ===
-const API_BASE = localStorage.getItem('API_BASE') || 'http://localhost:8080';
+const API_BASE = localStorage.getItem('API_BASE') || 'https://hangoutz-api.onrender.com';
 
 let TOKEN = localStorage.getItem('TOKEN') || null;
 let CART = []; // {itemId,name,qty,price}
