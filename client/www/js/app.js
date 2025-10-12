@@ -1,6 +1,8 @@
 
 // === CONFIG ===
-const API_BASE = localStorage.getItem('API_BASE') || '';
+const API_BASE = localStorage.getItem('API_BASE') || 'https://hangoutz-restaurant.onrender.com';
+location.reload();
+
 
 let TOKEN = localStorage.getItem('TOKEN') || null;
 let CART = []; // {itemId,name,qty,price}
@@ -158,23 +160,60 @@ $(document).on('pageshow', '#bookingPage', async function () {
 
 async function loadBookings() {
   try {
-    const res = await fetch(`${API_BASE}/api/bookings/my`, { headers: { ...authHeader() } });
+    const res  = await fetch(`${API_BASE}/api/bookings/my`, { headers: { ...authHeader() } });
     const list = await res.json();
     const $list = $('#bookingList').empty();
+
+    // fallbacks from what you stored on login
+    const fallbackName  = sessionStorage.getItem('userName')  || '—';
+    const fallbackEmail = sessionStorage.getItem('userEmail') || '—';
+
+    if (!Array.isArray(list) || list.length === 0) {
+      $list.append('<li>No bookings yet.</li>').listview().listview('refresh');
+      return;
+    }
+
     list.forEach((b) => {
-      const li = $(
-        `<li>
-          <h2>${b.date} ${b.time} • ${b.partySize} people</h2>
-          <p>${b.status}</p>
-        </li>`
-      );
+      const userName  = (b.user && b.user.name)  || b.customerName  || fallbackName;
+      const userEmail = (b.user && b.user.email) || b.customerEmail || fallbackEmail;
+
+      const li = $(`
+        <li>
+          <h2>${b.date} ${b.time} • ${b.partySize} ${b.partySize == 1 ? 'person' : 'people'}</h2>
+          <p><strong>Customer:</strong> ${userName} &lt;${userEmail}&gt;</p>
+          <p>${b.status || 'pending'}</p>
+          ${b.notes ? `<p><em>${b.notes}</em></p>` : ''}
+        </li>
+      `);
       $list.append(li);
     });
+
     $list.listview().listview('refresh');
   } catch (e) {
+    console.error(e);
     notify('Failed to load bookings');
   }
 }
+
+// async function loadBookings() {
+//   try {
+//     const res = await fetch(`${API_BASE}/api/bookings/my`, { headers: { ...authHeader() } });
+//     const list = await res.json();
+//     const $list = $('#bookingList').empty();
+//     list.forEach((b) => {
+//       const li = $(
+//         `<li>
+//           <h2>${b.date} ${b.time} • ${b.partySize} people</h2>
+//           <p>${b.status}</p>
+//         </li>`
+//       );
+//       $list.append(li);
+//     });
+//     $list.listview().listview('refresh');
+//   } catch (e) {
+//     notify('Failed to load bookings');
+//   }
+// }
 
 $('#bookingForm').on('submit', async function (e) {
   e.preventDefault();
@@ -198,36 +237,78 @@ $('#bookingForm').on('submit', async function (e) {
 });
 
 // === Orders List (customer) ===
+// $(document).on('pageshow', '#ordersPage', async function () {
+//   if (!TOKEN) return notify('Please login first.');
+//   try {
+//     const res = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
+//     const list = await res.json();
+//     const $list = $('#ordersList').empty();
+
+//     list.forEach((o) => {
+//       const itemsText = (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ') || '(no items)';
+//       const canDelete = (o.status === 'completed' || o.status === 'cancelled');
+
+//       const li = $(`
+//         <li data-id="${o._id}">
+//           <a href="#">
+//             <h2>Order ${o._id}</h2>
+//             <p><strong>Items:</strong> ${itemsText}</p>
+//             <p>Status: ${o.status} — Total: $${Number(o.total).toFixed(2)}</p>
+//           </a>
+//           ${canDelete ? '<a href="#" class="deleteOrderBtn">Delete</a>' : ''}
+//         </li>
+//       `);
+//       $list.append(li);
+//     });
+
+//     // enable split button style if any delete links exist
+//     $list.listview({ splitIcon: 'delete', splitTheme: 'b' }).listview('refresh');
+//   } catch (e) {
+//     notify('Failed to load orders');
+//   }
+// });
 $(document).on('pageshow', '#ordersPage', async function () {
   if (!TOKEN) return notify('Please login first.');
+
   try {
-    const res = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
+    const res  = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
     const list = await res.json();
     const $list = $('#ordersList').empty();
+
+    // fallbacks from session (set these on login)
+    const fallbackName  = sessionStorage.getItem('userName')  || '—';
+    const fallbackEmail = sessionStorage.getItem('userEmail') || '—';
 
     list.forEach((o) => {
       const itemsText = (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ') || '(no items)';
       const canDelete = (o.status === 'completed' || o.status === 'cancelled');
 
+      // prefer populated user -> snapshot fields -> session fallback
+      const userName  = (o.user && o.user.name) || o.customerName  || fallbackName;
+      const userEmail = (o.user && o.user.email) || o.customerEmail || fallbackEmail;
+
       const li = $(`
         <li data-id="${o._id}">
           <a href="#">
             <h2>Order ${o._id}</h2>
+            <p><strong>Customer:</strong> ${userName} &lt; ${ userEmail } &gt;</p>
             <p><strong>Items:</strong> ${itemsText}</p>
-            <p>Status: ${o.status} — Total: $${Number(o.total).toFixed(2)}</p>
+            <p>Status: ${o.status} — Total: $${Number(o.total || 0).toFixed(2)}</p>
           </a>
           ${canDelete ? '<a href="#" class="deleteOrderBtn">Delete</a>' : ''}
         </li>
       `);
+
       $list.append(li);
     });
 
-    // enable split button style if any delete links exist
     $list.listview({ splitIcon: 'delete', splitTheme: 'b' }).listview('refresh');
   } catch (e) {
+    console.error(e);
     notify('Failed to load orders');
   }
 });
+
 
 // Delete order (only for completed/cancelled — server enforces it)
 $(document).on('click', '.deleteOrderBtn', async function (e) {
