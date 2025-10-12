@@ -31,13 +31,15 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
-app.use(cors({
-  origin: ["https://hangoutz-restaurant.onrender.com"], // your frontend Render URL
+const corsConfig = {
+  origin: ['https://hangoutz-restaurant.onrender.com'], // add localhost if needed
+  credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
-  maxAge: 86400,
-  credentials: true
-}));
+  maxAge: 86400
+};
+app.use(cors(corsConfig));
+app.options('*', cors(corsConfig));
 
 // Enforce HTTPS (proxy-aware). For local testing over HTTP, comment this line.
 app.use(httpsOnly);
