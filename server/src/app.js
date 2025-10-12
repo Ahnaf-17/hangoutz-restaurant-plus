@@ -33,7 +33,9 @@ app.use(express.urlencoded({ extended: true }));
 // app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(cors({
   origin: ["https://hangoutz-restaurant.onrender.com"], // your frontend Render URL
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  maxAge: 86400,
   credentials: true
 }));
 
