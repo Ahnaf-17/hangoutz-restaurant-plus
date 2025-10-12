@@ -30,7 +30,12 @@ app.use(compression());
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+// app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+app.use(cors({
+  origin: ["https://hangoutz-restaurant.onrender.com"], // your frontend Render URL
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 
 // Enforce HTTPS (proxy-aware). For local testing over HTTP, comment this line.
 app.use(httpsOnly);
