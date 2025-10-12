@@ -31,6 +31,22 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const allowed = ['https://hangoutz-restaurant.onrender.com', 'http://localhost:3000', 'http://localhost:5173'];
+    const origin = allowed.includes(req.headers.origin) ? req.headers.origin : allowed[0];
+    res.set({
+      'Access-Control-Allow-Origin': origin,
+      'Vary': 'Origin',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization'
+    });
+    return res.sendStatus(204); // <- MUST be 200/204, never 404
+  }
+  return next();
+});
+
 const corsConfig = {
   origin: ['https://hangoutz-restaurant.onrender.com'], // add localhost if needed
   credentials: true,
