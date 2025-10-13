@@ -1,6 +1,23 @@
 # Hangoutz Restaurant+ — Hybrid Mobile App (Assignment 2)
 
-This repository contains a full-stack hybrid app:
+## 🚀 Deployment & Live Demo
+
+The **Hangoutz Restaurant+** project is fully deployed and accessible online.
+
+| Component | Platform | URL | Description |
+|------------|-----------|-----|-------------|
+| 🖥️ **Client (Front-end)** | Render (Static Site) | 🔗 [https://hangoutz-restaurant.onrender.com](https://hangoutz-restaurant.onrender.com) | jQuery Mobile–based responsive web app for customers and admins. |
+| ⚙️ **Server (Back-end API)** | Vercel (Serverless Node.js) | 🔗 [https://hangoutz-restaurant-plus.vercel.app](https://hangoutz-restaurant-plus.vercel.app) | Express REST API connected to MongoDB Atlas, handles authentication, orders, and bookings. |
+| 🗄️ **Database** | MongoDB Atlas | *(Private)* | Cloud-hosted NoSQL database for user, menu, order, and booking data. |
+
+### 🌐 Live Usage
+- The client and server communicate over **HTTPS**.  
+- API base URL is preconfigured as:  
+  ```js
+  const API_BASE = "https://hangoutz-restaurant-plus.vercel.app";
+
+
+## This repository contains a full-stack hybrid app:
 - **Client**: jQuery + jQuery Mobile (Cordova-ready)
 - **Server**: Node.js + Express + MongoDB Atlas (HTTPS, JWT, Routers)
 - **Deployment**: Render (server), Cordova (mobile build)
