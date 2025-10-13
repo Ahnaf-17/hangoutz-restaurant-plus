@@ -1,28 +1,52 @@
-
 // === CONFIG ===
-const API_BASE = localStorage.getItem('API_BASE') || 'https://hangoutz-restaurant-plus.vercel.app';
-location.reload();
+// Default to your Vercel API (you can override via localStorage.setItem('API_BASE', 'https://...'))
+const DEFAULT_API_BASE = 'https://hangoutz-restaurant-plus.vercel.app';
+let API_BASE = (localStorage.getItem('API_BASE') || DEFAULT_API_BASE).replace(/\/+$/, '');
 
+// Build safe URLs without accidental double slashes
+const apiUrl = (path) => `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 
+// Safe JSON parsing so empty bodies don't crash the app
+async function safeJson(res) {
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+// Unified fetch wrapper: adds headers, parses JSON, throws on !ok
+async function api(path, { method = 'GET', headers = {}, body, auth = false } = {}) {
+  const finalHeaders = { ...headers };
+  if (!(body instanceof FormData)) finalHeaders['Content-Type'] = finalHeaders['Content-Type'] || 'application/json';
+  if (auth && TOKEN) finalHeaders['Authorization'] = `Bearer ${TOKEN}`;
+
+  const res = await fetch(apiUrl(path), {
+    method,
+    headers: finalHeaders,
+    body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : undefined,
+    // credentials: 'include', // ONLY if your API uses cookies; you're using bearer tokens so keep this commented
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) {
+    const msg = (data && (data.error || data.message)) || `Request failed (${res.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// === STATE ===
 let TOKEN = localStorage.getItem('TOKEN') || null;
 let CART = []; // {itemId,name,qty,price}
 let CURRENT_USER = null;
 
 // === Helpers ===
-const authHeader = () => (TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {});
-const setToken = (t) => {
-  TOKEN = t;
-  localStorage.setItem('TOKEN', t);
-};
+const setToken = (t) => { TOKEN = t; localStorage.setItem('TOKEN', t); };
 const notify = (msg) => alert(msg);
 
-// Small helper to fetch current user and cache it
+// Fetch current user (and cache)
 async function fetchMe() {
   if (!TOKEN) return null;
   try {
-    const res = await fetch(`${API_BASE}/api/users/me`, { headers: { ...authHeader() } });
-    if (!res.ok) return null;
-    const me = await res.json();
+    const me = await api('/api/users/me', { auth: true });
     CURRENT_USER = me;
     return me;
   } catch {
@@ -47,16 +71,21 @@ $(document).on('pageinit', '#loginPage', function () {
     const email = $('#email').val().trim();
     const password = $('#password').val();
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      const data = await api('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: { email, password }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
+
+      // Expecting { token, user }
+      if (!data?.token) throw new Error('Login failed (no token)');
 
       setToken(data.token);
-      await toggleAdminBtn(); // set CURRENT_USER + show/hide Admin
+      // keep a couple fallbacks around
+      if (data.user) {
+        sessionStorage.setItem('userName', data.user.name || '');
+        sessionStorage.setItem('userEmail', data.user.email || '');
+      }
+      await toggleAdminBtn();
       $.mobile.changePage('#homePage');
     } catch (err) {
       notify(err.message);
@@ -79,15 +108,18 @@ $(document).on('pageinit', '#signupPage', function () {
     const email = $('#semail').val().trim();
     const password = $('#spassword').val();
     try {
-      const res = await fetch(`${API_BASE}/api/auth/signup`, {
+      const data = await api('/api/auth/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: { name, email, password }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Signup failed');
+
+      if (!data?.token) throw new Error('Signup failed (no token)');
 
       setToken(data.token);
+      if (data.user) {
+        sessionStorage.setItem('userName', data.user.name || '');
+        sessionStorage.setItem('userEmail', data.user.email || '');
+      }
       await toggleAdminBtn();
       $.mobile.changePage('#homePage');
     } catch (err) {
@@ -104,19 +136,18 @@ $(document).on('pageshow', '#homePage', async function () {
 // === Menu ===
 $(document).on('pageshow', '#menuPage', async function () {
   try {
-    const res = await fetch(`${API_BASE}/api/menu`);
-    const items = await res.json();
+    const items = await api('/api/menu');
     const $list = $('#menuList').empty();
     items.forEach((it) => {
-      const li = $(
-        `<li>
+      const li = $(`
+        <li>
           <a href="#">
             <h2>${it.name}</h2>
             <p>${it.description || ''}</p>
             <span class="price">$${Number(it.price).toFixed(2)}</span>
           </a>
-        </li>`
-      );
+        </li>
+      `);
       li.on('click', function () {
         const existing = CART.find((x) => x.itemId === it._id);
         if (existing) {
@@ -138,13 +169,11 @@ $('#placeOrderBtn').on('click', async function () {
   if (!TOKEN) return notify('Please login first.');
   if (!CART.length) return notify('Cart is empty.');
   try {
-    const res = await fetch(`${API_BASE}/api/orders`, {
+    await api('/api/orders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ items: CART }),
+      auth: true,
+      body: { items: CART }
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Order failed');
     CART = [];
     notify('Order placed!');
   } catch (e) {
@@ -160,11 +189,9 @@ $(document).on('pageshow', '#bookingPage', async function () {
 
 async function loadBookings() {
   try {
-    const res  = await fetch(`${API_BASE}/api/bookings/my`, { headers: { ...authHeader() } });
-    const list = await res.json();
+    const list = await api('/api/bookings/my', { auth: true });
     const $list = $('#bookingList').empty();
 
-    // fallbacks from what you stored on login
     const fallbackName  = sessionStorage.getItem('userName')  || '—';
     const fallbackEmail = sessionStorage.getItem('userEmail') || '—';
 
@@ -195,26 +222,6 @@ async function loadBookings() {
   }
 }
 
-// async function loadBookings() {
-//   try {
-//     const res = await fetch(`${API_BASE}/api/bookings/my`, { headers: { ...authHeader() } });
-//     const list = await res.json();
-//     const $list = $('#bookingList').empty();
-//     list.forEach((b) => {
-//       const li = $(
-//         `<li>
-//           <h2>${b.date} ${b.time} • ${b.partySize} people</h2>
-//           <p>${b.status}</p>
-//         </li>`
-//       );
-//       $list.append(li);
-//     });
-//     $list.listview().listview('refresh');
-//   } catch (e) {
-//     notify('Failed to load bookings');
-//   }
-// }
-
 $('#bookingForm').on('submit', async function (e) {
   e.preventDefault();
   const partySize = parseInt($('#partySize').val(), 10);
@@ -222,13 +229,11 @@ $('#bookingForm').on('submit', async function (e) {
   const time = $('#btime').val().trim();
   const notes = $('#bnotes').val().trim();
   try {
-    const res = await fetch(`${API_BASE}/api/bookings`, {
+    await api('/api/bookings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ partySize, date, time, notes }),
+      auth: true,
+      body: { partySize, date, time, notes }
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Booking failed');
     notify('Booking created.');
     await loadBookings();
   } catch (e) {
@@ -237,45 +242,13 @@ $('#bookingForm').on('submit', async function (e) {
 });
 
 // === Orders List (customer) ===
-// $(document).on('pageshow', '#ordersPage', async function () {
-//   if (!TOKEN) return notify('Please login first.');
-//   try {
-//     const res = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
-//     const list = await res.json();
-//     const $list = $('#ordersList').empty();
-
-//     list.forEach((o) => {
-//       const itemsText = (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ') || '(no items)';
-//       const canDelete = (o.status === 'completed' || o.status === 'cancelled');
-
-//       const li = $(`
-//         <li data-id="${o._id}">
-//           <a href="#">
-//             <h2>Order ${o._id}</h2>
-//             <p><strong>Items:</strong> ${itemsText}</p>
-//             <p>Status: ${o.status} — Total: $${Number(o.total).toFixed(2)}</p>
-//           </a>
-//           ${canDelete ? '<a href="#" class="deleteOrderBtn">Delete</a>' : ''}
-//         </li>
-//       `);
-//       $list.append(li);
-//     });
-
-//     // enable split button style if any delete links exist
-//     $list.listview({ splitIcon: 'delete', splitTheme: 'b' }).listview('refresh');
-//   } catch (e) {
-//     notify('Failed to load orders');
-//   }
-// });
 $(document).on('pageshow', '#ordersPage', async function () {
   if (!TOKEN) return notify('Please login first.');
 
   try {
-    const res  = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
-    const list = await res.json();
+    const list = await api('/api/orders/my', { auth: true });
     const $list = $('#ordersList').empty();
 
-    // fallbacks from session (set these on login)
     const fallbackName  = sessionStorage.getItem('userName')  || '—';
     const fallbackEmail = sessionStorage.getItem('userEmail') || '—';
 
@@ -283,7 +256,6 @@ $(document).on('pageshow', '#ordersPage', async function () {
       const itemsText = (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ') || '(no items)';
       const canDelete = (o.status === 'completed' || o.status === 'cancelled');
 
-      // prefer populated user -> snapshot fields -> session fallback
       const userName  = (o.user && o.user.name) || o.customerName  || fallbackName;
       const userEmail = (o.user && o.user.email) || o.customerEmail || fallbackEmail;
 
@@ -309,7 +281,6 @@ $(document).on('pageshow', '#ordersPage', async function () {
   }
 });
 
-
 // Delete order (only for completed/cancelled — server enforces it)
 $(document).on('click', '.deleteOrderBtn', async function (e) {
   e.preventDefault();
@@ -317,18 +288,10 @@ $(document).on('click', '.deleteOrderBtn', async function (e) {
   if (!confirm('Delete this order? This cannot be undone.')) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/orders/${id}`, {
-      method: 'DELETE',
-      headers: { ...authHeader() }
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Delete failed');
-
+    await api(`/api/orders/${id}`, { method: 'DELETE', auth: true });
     notify('Order deleted');
 
-    // refresh the list
-    const refresh = await fetch(`${API_BASE}/api/orders/my`, { headers: { ...authHeader() } });
-    const list = await refresh.json();
+    const list = await api('/api/orders/my', { auth: true });
     const $list = $('#ordersList').empty();
     list.forEach((o) => {
       const itemsText = (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ') || '(no items)';
@@ -351,13 +314,11 @@ $(document).on('click', '.deleteOrderBtn', async function (e) {
   }
 });
 
-
 // === Profile ===
 $(document).on('pageshow', '#profilePage', async function () {
   if (!TOKEN) return notify('Please login first.');
   try {
-    const res = await fetch(`${API_BASE}/api/users/me`, { headers: { ...authHeader() } });
-    const me = await res.json();
+    const me = await api('/api/users/me', { auth: true });
     $('#profileBox').html(
       `<p><strong>Name:</strong> ${me.name}</p>
        <p><strong>Email:</strong> ${me.email}</p>
@@ -368,10 +329,7 @@ $(document).on('pageshow', '#profilePage', async function () {
   }
 });
 
-
-
 // ======== ADMIN FEATURES ========
-
 
 // Admin page guard + loaders
 $(document).on('pageshow', '#adminPage', async function () {
@@ -400,21 +358,13 @@ $('#adminCreateMenuForm').on('submit', async function (e) {
     available: $('#mAvail').is(':checked'),
   };
   try {
-    const res = await fetch(`${API_BASE}/api/menu`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Create failed');
-
+    await api('/api/menu', { method: 'POST', auth: true, body });
     // clear form
     $('#mName').val('');
     $('#mPrice').val('');
     $('#mCategory').val('General');
     $('#mDesc').val('');
     $('#mAvail').prop('checked', true);
-
     await adminLoadMenu();
     notify('Item created');
   } catch (e) {
@@ -425,8 +375,7 @@ $('#adminCreateMenuForm').on('submit', async function (e) {
 // Load all menu items (Admin)
 async function adminLoadMenu() {
   try {
-    const res = await fetch(`${API_BASE}/api/menu`);
-    const items = await res.json();
+    const items = await api('/api/menu');
     const $list = $('#adminMenuList').empty();
     items.forEach((it) => {
       const li = $(`
@@ -456,13 +405,7 @@ $(document).on('click', '.editMenuBtn', async function (e) {
   if (newPrice === null) return;
   const body = { price: parseFloat(newPrice) };
   try {
-    const res = await fetch(`${API_BASE}/api/menu/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Update failed');
+    await api(`/api/menu/${id}`, { method: 'PUT', auth: true, body });
     await adminLoadMenu();
     notify('Updated');
   } catch (err) {
@@ -475,12 +418,7 @@ $(document).on('click', '.deleteMenuBtn', async function (e) {
   const id = $(this).closest('li').data('id');
   if (!confirm('Delete this item?')) return;
   try {
-    const res = await fetch(`${API_BASE}/api/menu/${id}`, {
-      method: 'DELETE',
-      headers: { ...authHeader() },
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Delete failed');
+    await api(`/api/menu/${id}`, { method: 'DELETE', auth: true });
     await adminLoadMenu();
     notify('Deleted');
   } catch (err) {
@@ -491,8 +429,7 @@ $(document).on('click', '.deleteMenuBtn', async function (e) {
 // Load all orders (Admin)
 async function adminLoadOrders() {
   try {
-    const res = await fetch(`${API_BASE}/api/orders`, { headers: { ...authHeader() } });
-    const orders = await res.json();
+    const orders = await api('/api/orders', { auth: true });
     const $list = $('#adminOrdersList').empty();
     orders.forEach((o) => {
       const options = ['placed', 'preparing', 'ready', 'completed', 'cancelled']
@@ -518,8 +455,7 @@ async function adminLoadOrders() {
 
 async function adminLoadBookings() {
   try {
-    const res = await fetch(`${API_BASE}/api/bookings`, { headers: { ...authHeader() } });
-    const bookings = await res.json();
+    const bookings = await api('/api/bookings', { auth: true });
     const $list = $('#adminBookingsList').empty();
 
     bookings.forEach(b => {
@@ -550,7 +486,6 @@ async function adminLoadBookings() {
   }
 }
 
-
 // Apply order status change (Admin)
 $(document).on('click', '.applyStatusBtn', async function (e) {
   e.preventDefault();
@@ -558,13 +493,11 @@ $(document).on('click', '.applyStatusBtn', async function (e) {
   const id = $li.data('id');
   const status = $li.find('select.orderStatusSel').val();
   try {
-    const res = await fetch(`${API_BASE}/api/orders/${id}/status`, {
+    await api(`/api/orders/${id}/status`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ status }),
+      auth: true,
+      body: { status }
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Update failed');
     notify('Status updated');
     await adminLoadOrders();
   } catch (err) {
@@ -577,13 +510,11 @@ $(document).on('click', '#adminBookingsList .approveBookingBtn', async function 
   e.preventDefault();
   const id = $(this).closest('li').data('id');
   try {
-    const res = await fetch(`${API_BASE}/api/bookings/${id}/status`, {
+    await api(`/api/bookings/${id}/status`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ status: 'confirmed' })
+      auth: true,
+      body: { status: 'confirmed' }
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Approve failed');
     notify('Booking approved');
     await adminLoadBookings();
   } catch (err) {
@@ -598,17 +529,14 @@ $(document).on('click', '#adminBookingsList .cancelBookingBtn', async function (
   if (!confirm('Cancel this booking?')) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/bookings/${id}/status`, {
+    await api(`/api/bookings/${id}/status`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ status: 'cancelled' })
+      auth: true,
+      body: { status: 'cancelled' }
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Cancel failed');
     notify('Booking cancelled');
     await adminLoadBookings();
   } catch (err) {
     notify(err.message);
   }
 });
-
