@@ -1,7 +1,6 @@
 
 // === CONFIG ===
-const API_BASE = 
- 'https://hangoutz-restaurant-plus.vercel.app';
+const API_BASE = localStorage.getItem('API_BASE') || 'https://hangoutz-restaurant-plus.vercel.app';
 location.reload();
 
 
