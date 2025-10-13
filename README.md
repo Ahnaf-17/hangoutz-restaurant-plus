@@ -14,7 +14,7 @@ The **Hangoutz Restaurant+** project is fully deployed and accessible online.
 - The client and server communicate over **HTTPS**.  
 - API base URL is preconfigured as:  
   ```js
-  const API_BASE = "https://hangoutz-restaurant-plus.vercel.app";
+  const API_BASE = "https://hangoutz-restaurant.onrender.com";
 
 
 ## This repository contains a full-stack hybrid app:
